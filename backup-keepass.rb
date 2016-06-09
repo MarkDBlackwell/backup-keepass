@@ -6,6 +6,7 @@ Change dates:
 (mdb) March 10, 2011 - some change
 (mdb) September 14, 2011 - allow 'open' of extension, '.rb' by editor, not Ruby interpreter
 (mdb) July 18, 2012 - use Ruby in PATH
+(mdb) June 9, 2016 - refactor; short wait, so bootup can complete
 
 Program name:      Back Up KeePass.
 Usage:             Runs on boot.
@@ -43,16 +44,35 @@ References:
 
 require 'pathname'
 
-WORKING=Pathname Dir.pwd
-DATABASE='Database.kdb'
-T=Time.now
-CHANGING=sprintf '%04d-'+'%02d-'*2+'%02d.'*3, T.year, T.month, T.day, T.hour, T.min,
-    T.sec
-READ_ONLY,WRITE_ONLY = %w[r w]
-FROM,TO=[READ_ONLY,WRITE_ONLY].zip(
-    ['',CHANGING],
-    [ %w[  Dropbox  KeePass  ],  %w[ KeePass-backups  ] ]
-    ).map{|mode,prefix,nodes|
-    File.new WORKING.join(*nodes).realpath.join(prefix + DATABASE), mode + 'b'}
-print "#{TO.write FROM.read} bytes copied.\n"
-sleep 5 # Keep the message visible for a UX-reasonable time.
+SHORT_WAIT = 5 * 60
+SHORT_WAIT_SECONDS = SHORT_WAIT % 60 
+s = 0 == SHORT_WAIT_SECONDS ? '' : " #{SHORT_WAIT_SECONDS} seconds"
+SHORT_WAIT_STRING = "#{SHORT_WAIT.div 60} minutes#{s}"
+BOOTUP_MESSAGE = \
+    "Waiting #{SHORT_WAIT_STRING} for:" \
+    " bootup," \
+    " Internet access," \
+    " (something like) Dropbox to fetch a (possibly-)updated Keepass database," \
+    " etc. ...\n"
+::Kernel.print BOOTUP_MESSAGE
+::Kernel.sleep SHORT_WAIT
+
+WORKING  = ::Pathname.new ::Dir.pwd
+DATABASE = 'Database.kdb'
+T = ::Time.now
+CHANGING = ::Kernel.sprintf '%04d-' + '%02d-'*2 + '%02d.'*3,
+    T.year, T.month, T.day, T.hour, T.min, T.sec
+READ_ONLY, WRITE_ONLY = %w[r w]
+
+FROM, TO =
+    [ %w[  Dropbox  KeePass  ],  %w[ KeePass-backups  ] ].zip(
+    [   READ_ONLY,                 WRITE_ONLY           ],
+    [   '',                        CHANGING             ]).
+    map do |nodes, mode, prefix|
+  path = WORKING.join(*nodes).realpath.join prefix + DATABASE
+  ::File.new path, mode + 'b'
+end
+# Use methods of File's parent class, IO:
+bytes = TO.write FROM.read
+::Kernel.print "#{bytes} bytes copied.\n"
+::Kernel.sleep 5 # Keep the message visible for a UX-reasonable time.
