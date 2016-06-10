@@ -15,25 +15,26 @@ Justification:     Can give you more protection from Dropbox losing or altering 
 Function summary:  At boot, copies a KeePass database to another (time-stamped) file name.
 
 Background:
-  Dropbox can be used to access your latest password changes while you are on other computers.
+  Something like Dropbox can be used to access your latest password changes while you are on other computers.
   In other words, it can keep a KeePass Password Safe database up to date.
   It does this between computers, automatically synchronizing the contents of a Dropbox folder.
-  But, synchronization might be dangerous! You might lose your latest changes, or even your whole password database.
+  But, synchronization might be dangerous!
+  You might lose your latest changes, or even conceivably your whole password database.
 
 Requirements:
   o. Microsoft Windows.
-  o. Ruby language.
-  o. Your Dropbox location is "%USERPROFILE%\My Documents\Dropbox" (right under your My Documents folder as usual).
+  o. Ruby language is installed.
+  o. Your Dropbox location is "%USERPROFILE%\My Documents\Dropbox" (right under your My Documents folder, as usual).
 
 Setup instructions:
-  1. Copy your KeePass database to another (backup) location.
+  1. First (for safety), copy your KeePass database to some other (backup) location.
   2. In "My Documents\Dropbox", make a folder called, "KeePass". (In full, "%USERPROFILE%\My Documents\Dropbox\KeePass".)
   3. Move your KeePass database to the folder.
-  4. Copy the shortcut, "backup-keepass" from this program's installation directory to your Windows startup folder.
+  4. Copy the shortcut, "backup-keepass" from this program's installation directory to anywhere in your Windows startup folder.
   5. Under tab, "Shortcut" of its properties, "Start in" should contain "%USERPROFILE%\My Documents".
   6. Click the new shortcut.
-  7. Verify that now a currently-timestamped copy (with the right length) of your database exists in the folder, "%USERPROFILE%\My Documents\KeePass-backups".
-  8. In KeePass, browse for your database at the new location.
+  7. Verify that a currently-timestamped copy (with the right, same length) of your database exists now in the folder, "%USERPROFILE%\My Documents\KeePass-backups".
+  8. In KeePass, browse for your database at the new location (once, assuming you've set Keepass' option to remember the database location).
   9. Every time you think of it later, delete all but the latest timestamped copy.
 
 References:
@@ -44,10 +45,12 @@ References:
 
 require 'pathname'
 
-SHORT_WAIT = 5 * 60
-SHORT_WAIT_SECONDS = SHORT_WAIT % 60 
-s = 0 == SHORT_WAIT_SECONDS ? '' : " #{SHORT_WAIT_SECONDS} seconds"
-SHORT_WAIT_STRING = "#{SHORT_WAIT.div 60} minutes#{s}"
+EMPTY = String.new.freeze
+SHORT_WAIT         =          5   * 60 # Seconds.
+SHORT_WAIT_SECONDS = SHORT_WAIT   % 60 
+SECONDS_PHRASE = 0 == SHORT_WAIT_SECONDS ? EMPTY : " #{SHORT_WAIT_SECONDS} seconds"
+SHORT_WAIT_MINUTES = SHORT_WAIT.div 60
+SHORT_WAIT_STRING = "#{SHORT_WAIT_MINUTES} minutes#{SECONDS_PHRASE}"
 BOOTUP_MESSAGE = \
     "Waiting #{SHORT_WAIT_STRING} for:" \
     " bootup," \
@@ -57,8 +60,8 @@ BOOTUP_MESSAGE = \
 ::Kernel.print BOOTUP_MESSAGE
 ::Kernel.sleep SHORT_WAIT
 
-WORKING  = ::Pathname.new ::Dir.pwd
 DATABASE = 'Database.kdb'
+WORKING  = ::Pathname.new ::Dir.pwd
 T = ::Time.now
 CHANGING = ::Kernel.sprintf '%04d-' + '%02d-'*2 + '%02d.'*3,
     T.year, T.month, T.day, T.hour, T.min, T.sec
@@ -67,12 +70,20 @@ READ_ONLY, WRITE_ONLY = %w[r w]
 FROM, TO =
     [ %w[  Dropbox  KeePass  ],  %w[ KeePass-backups  ] ].zip(
     [   READ_ONLY,                 WRITE_ONLY           ],
-    [   '',                        CHANGING             ]).
+    [   EMPTY,                     CHANGING             ]).
     map do |nodes, mode, prefix|
   path = WORKING.join(*nodes).realpath.join prefix + DATABASE
   ::File.new path, mode + 'b'
 end
+
 # Use methods of File's parent class, IO:
-bytes = TO.write FROM.read
-::Kernel.print "#{bytes} bytes copied.\n"
-::Kernel.sleep 5 # Keep the message visible for a UX-reasonable time.
+BYTES = TO.write FROM.read
+::Kernel.print "#{BYTES} bytes copied.\n"
+
+[FROM, TO].each{|e| e.close}
+
+VISIBLE_RESULTS_MESSAGE = 'Keeping the results visible for a UX-reasonable time.'
+::Kernel.print VISIBLE_RESULTS_MESSAGE
+
+VISIBLE_RESULTS_WAIT = 1 * 60 # Seconds.
+::Kernel.sleep VISIBLE_RESULTS_WAIT
